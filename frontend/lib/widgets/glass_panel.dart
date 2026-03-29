@@ -45,18 +45,18 @@ class _GlassPanelState extends State<GlassPanel> {
           curve: Curves.easeOut,
           padding: widget.padding,
           decoration: BoxDecoration(
-            color: widget.tintColor ?? Colors.white.withValues(alpha: 0.62),
+            color: widget.tintColor ?? Colors.white.withValues(alpha: 0.82),
             gradient: widget.gradient,
             borderRadius: widget.borderRadius,
-            border: Border.all(color: Colors.white.withValues(alpha: 0.55)),
+            border: Border.all(color: AppColors.border),
             boxShadow: [
               BoxShadow(
-                color: Colors.white.withValues(alpha: 0.22),
+                color: Colors.white.withValues(alpha: 0.6),
                 blurRadius: 10,
                 offset: const Offset(-2, -2),
               ),
               BoxShadow(
-                color: AppColors.primary.withValues(alpha: 0.14),
+                color: AppColors.primary.withValues(alpha: 0.08),
                 blurRadius: 16,
                 offset: const Offset(4, 8),
               ),

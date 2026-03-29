@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import 'dashboard_screen.dart';
@@ -13,232 +14,263 @@ class SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends State<SplashScreen>
     with TickerProviderStateMixin {
-  late AnimationController _logoController;
+  late AnimationController _topoController;
+  late AnimationController _lineController;
   late AnimationController _textController;
-  late AnimationController _grainController;
-  late Animation<double> _scaleAnimation;
-  late Animation<double> _fadeAnimation;
-  late Animation<double> _textFade;
-  late Animation<double> _ringAnimation;
+  late AnimationController _btnController;
+
+  late Animation<double> _topoFade;
+  late Animation<double> _greenGlowScale;
+
+  // Per-line slide-in animations
+  late List<Animation<Offset>> _lineSlides;
+  late List<Animation<double>> _lineFades;
+
+  late Animation<double> _btnFade;
+  late Animation<Offset> _btnSlide;
 
   @override
   void initState() {
     super.initState();
 
-    _logoController = AnimationController(
+    _topoController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1200),
+      duration: const Duration(milliseconds: 1000),
     );
-    _textController = AnimationController(
+    _lineController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 800),
+      duration: const Duration(milliseconds: 1400),
     );
-    _grainController = AnimationController(
+    _btnController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 2600),
-    )..repeat(reverse: true);
+      duration: const Duration(milliseconds: 600),
+    );
 
-    _scaleAnimation = Tween<double>(begin: 0.3, end: 1.0).animate(
-      CurvedAnimation(parent: _logoController, curve: Curves.elasticOut),
+    _topoFade = Tween<double>(begin: 0, end: 1).animate(
+      CurvedAnimation(parent: _topoController, curve: Curves.easeOut),
     );
-    _fadeAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(parent: _logoController, curve: Curves.easeIn));
-    _ringAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(parent: _logoController, curve: Curves.easeOut));
-    _textFade = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(parent: _textController, curve: Curves.easeIn));
+    _greenGlowScale = Tween<double>(begin: 0.5, end: 1.0).animate(
+      CurvedAnimation(parent: _topoController, curve: Curves.easeOut),
+    );
 
-    _logoController.forward().then((_) {
-      _textController.forward();
-      Future.delayed(const Duration(milliseconds: 1500), () {
-        if (mounted && !widget.standaloneMode) {
-          Navigator.of(context).pushReplacement(
-            PageRouteBuilder(
-              pageBuilder: (context, animation, _) => const DashboardScreen(),
-              transitionsBuilder: (context, animation, _, child) {
-                return FadeTransition(opacity: animation, child: child);
-              },
-              transitionDuration: const Duration(milliseconds: 600),
-            ),
-          );
-        }
+    // 5 text lines with staggered intervals
+    final lineCount = 5;
+    _lineSlides = List.generate(lineCount, (i) {
+      final start = (i * 0.15).clamp(0.0, 1.0);
+      final end = (start + 0.4).clamp(0.0, 1.0);
+      return Tween<Offset>(
+        begin: const Offset(0, 0.4),
+        end: Offset.zero,
+      ).animate(
+        CurvedAnimation(
+          parent: _lineController,
+          curve: Interval(start, end, curve: Curves.easeOutCubic),
+        ),
+      );
+    });
+    _lineFades = List.generate(lineCount, (i) {
+      final start = (i * 0.15).clamp(0.0, 1.0);
+      final end = (start + 0.35).clamp(0.0, 1.0);
+      return Tween<double>(begin: 0, end: 1).animate(
+        CurvedAnimation(
+          parent: _lineController,
+          curve: Interval(start, end, curve: Curves.easeOut),
+        ),
+      );
+    });
+
+    _btnFade = Tween<double>(begin: 0, end: 1).animate(
+      CurvedAnimation(parent: _btnController, curve: Curves.easeOut),
+    );
+    _btnSlide = Tween<Offset>(
+      begin: const Offset(0, 0.3),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(parent: _btnController, curve: Curves.easeOut));
+
+    // Sequence: topo → lines → button → navigate
+    _topoController.forward().then((_) {
+      _lineController.forward().then((_) {
+        _btnController.forward().then((_) {
+          Future.delayed(const Duration(milliseconds: 1200), () {
+            if (mounted && !widget.standaloneMode) {
+              Navigator.of(context).pushReplacement(
+                PageRouteBuilder(
+                  pageBuilder: (context, animation, _) =>
+                      const DashboardScreen(),
+                  transitionsBuilder: (context, animation, _, child) {
+                    return FadeTransition(opacity: animation, child: child);
+                  },
+                  transitionDuration: const Duration(milliseconds: 700),
+                ),
+              );
+            }
+          });
+        });
       });
     });
   }
 
   @override
   void dispose() {
-    _logoController.dispose();
-    _textController.dispose();
-    _grainController.dispose();
+    _topoController.dispose();
+    _lineController.dispose();
+    _btnController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: Stack(
         fit: StackFit.expand,
         children: [
-          const DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Color(0xFF131D12), Color(0xFF0B110B)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
+          // Topographic contour background
+          AnimatedBuilder(
+            animation: _topoFade,
+            builder: (context, child) => Opacity(
+              opacity: _topoFade.value,
+              child: CustomPaint(
+                painter: _TopoPainter(),
+                size: Size(size.width, size.height * 0.65),
               ),
             ),
           ),
-          Positioned(
-            top: -80,
-            left: -50,
-            child: _blurOrb(
-              color: AppColors.highlightWarm.withValues(alpha: 0.12),
-              size: 220,
+
+          // Green glow blob top right
+          AnimatedBuilder(
+            animation: _greenGlowScale,
+            builder: (context, child) => Positioned(
+              top: size.height * 0.08,
+              right: -size.width * 0.12,
+              child: Transform.scale(
+                scale: _greenGlowScale.value,
+                child: Container(
+                  width: size.width * 0.55,
+                  height: size.width * 0.55,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(
+                      colors: [
+                        AppColors.primaryLight.withValues(alpha: 0.50),
+                        AppColors.primaryLight.withValues(alpha: 0.20),
+                        AppColors.primaryLight.withValues(alpha: 0.0),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
             ),
           ),
-          Positioned(
-            bottom: -70,
-            right: -40,
-            child: _blurOrb(
-              color: AppColors.accent.withValues(alpha: 0.15),
-              size: 240,
-            ),
-          ),
-          _buildGrainMotionLayer(),
-          Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                AnimatedBuilder(
-                  animation: _logoController,
-                  builder: (context, child) {
-                    return FadeTransition(
-                      opacity: _fadeAnimation,
-                      child: ScaleTransition(
-                        scale: _scaleAnimation,
-                        child: Stack(
-                          alignment: Alignment.center,
-                          children: [
-                            Transform.scale(
-                              scale: 0.4 + _ringAnimation.value * 0.6,
-                              child: Container(
-                                width: 120,
-                                height: 120,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: AppColors.accent.withValues(
-                                      alpha: 1.0 - _ringAnimation.value * 0.5,
-                                    ),
-                                    width: 2,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            Container(
-                              width: 80,
-                              height: 80,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                gradient: const RadialGradient(
-                                  colors: [
-                                    Color(0xFF6C8E00),
-                                    Color(0xFF315B2D),
-                                  ],
-                                ),
-                                boxShadow: AppShadows.raised,
-                              ),
-                              child: const Icon(
-                                Icons.satellite_alt,
-                                color: Colors.white,
-                                size: 36,
-                              ),
-                            ),
-                          ],
+
+          // Main content
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.x6,
+                vertical: AppSpacing.x4,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Spacer(flex: 3),
+
+                  // Stacked bold headline lines
+                  _animatedLine(
+                    0,
+                    Text(
+                      'VERIFY',
+                      style: TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 44,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: -1.0,
+                        height: 1.05,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  _animatedLine(
+                    1,
+                    _SatelliteBadge(),
+                  ),
+                  const SizedBox(height: 4),
+                  _animatedLine(
+                    2,
+                    Text(
+                      'DAMAGE',
+                      style: TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 44,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: -1.0,
+                        height: 1.05,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  _animatedLine(
+                    3,
+                    Text(
+                      'WITH',
+                      style: TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 44,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: -1.0,
+                        height: 1.05,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  _animatedLine(
+                    4,
+                    Row(
+                      children: [
+                        Text(
+                          '——',
+                          style: TextStyle(
+                            color: AppColors.textPrimary,
+                            fontSize: 36,
+                            fontWeight: FontWeight.w400,
+                            letterSpacing: -1.0,
+                          ),
                         ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'SATELLITE AI',
+                          style: TextStyle(
+                            color: AppColors.textPrimary,
+                            fontSize: 34,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: -1.0,
+                            height: 1.05,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const Spacer(flex: 2),
+
+                  // CTA Button row
+                  AnimatedBuilder(
+                    animation: _btnController,
+                    builder: (context, child) => FadeTransition(
+                      opacity: _btnFade,
+                      child: SlideTransition(
+                        position: _btnSlide,
+                        child: child,
                       ),
-                    );
-                  },
-                ),
-                const SizedBox(height: 32),
-                AnimatedBuilder(
-                  animation: _textController,
-                  builder: (context, child) {
-                    return FadeTransition(
-                      opacity: _textFade,
-                      child: Column(
-                        children: [
-                          const Text(
-                            'AgriSentinel',
-                            style: TextStyle(
-                              color: AppColors.textPrimary,
-                              fontSize: 32,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: -0.5,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'SATELLITE-GUIDED CROP DAMAGE VERIFICATION',
-                            style: TextStyle(
-                              color: AppColors.textMuted,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w600,
-                              letterSpacing: 1.5,
-                            ),
-                          ),
-                          const SizedBox(height: AppSpacing.x5),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: AppSpacing.x5,
-                              vertical: AppSpacing.x3,
-                            ),
-                            decoration: BoxDecoration(
-                              gradient: const LinearGradient(
-                                colors: [
-                                  AppColors.accentSoft,
-                                  AppColors.accent,
-                                ],
-                              ),
-                              borderRadius: BorderRadius.circular(30),
-                              boxShadow: AppShadows.raised,
-                            ),
-                            child: const Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.agriculture_outlined,
-                                  size: 18,
-                                  color: Colors.white,
-                                ),
-                                SizedBox(width: AppSpacing.x2),
-                                Text(
-                                  'GET STARTED',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w700,
-                                    letterSpacing: 0.6,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: AppSpacing.x4),
-                          _LoadingDots(),
-                        ],
-                      ),
-                    );
-                  },
-                ),
-              ],
+                    ),
+                    child: _buildCtaRow(),
+                  ),
+
+                  const SizedBox(height: AppSpacing.x6),
+                ],
+              ),
             ),
           ),
         ],
@@ -246,98 +278,167 @@ class _SplashScreenState extends State<SplashScreen>
     );
   }
 
-  Widget _buildGrainMotionLayer() {
+  Widget _animatedLine(int index, Widget child) {
     return AnimatedBuilder(
-      animation: _grainController,
-      builder: (context, child) {
-        final t = _grainController.value;
-        return Stack(
-          children: [
-            _grainGlyph(50 + t * 20, 180 - t * 12, 0.16),
-            _grainGlyph(280 - t * 14, 260 + t * 10, 0.12),
-            _grainGlyph(130 + t * 18, 500 - t * 8, 0.10),
-          ],
-        );
-      },
-    );
-  }
-
-  Widget _grainGlyph(double left, double top, double alpha) {
-    return Positioned(
-      left: left,
-      top: top,
-      child: Icon(
-        Icons.grass_rounded,
-        color: AppColors.oliveLight.withValues(alpha: alpha),
-        size: 34,
+      animation: _lineController,
+      builder: (context, _) => FadeTransition(
+        opacity: _lineFades[index],
+        child: SlideTransition(
+          position: _lineSlides[index],
+          child: child,
+        ),
       ),
     );
   }
 
-  Widget _blurOrb({required Color color, required double size}) {
-    return IgnorePointer(
-      child: Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: color,
-          boxShadow: [
-            BoxShadow(color: color, blurRadius: 64, spreadRadius: 28),
-          ],
+  Widget _buildCtaRow() {
+    return Row(
+      children: [
+        Expanded(
+          child: GestureDetector(
+            onTap: () {
+              if (!widget.standaloneMode) {
+                Navigator.of(context).pushReplacement(
+                  PageRouteBuilder(
+                    pageBuilder: (context, animation, _) =>
+                        const DashboardScreen(),
+                    transitionsBuilder: (context, animation, _, child) {
+                      return FadeTransition(opacity: animation, child: child);
+                    },
+                    transitionDuration: const Duration(milliseconds: 600),
+                  ),
+                );
+              }
+            },
+            child: Container(
+              height: 58,
+              decoration: BoxDecoration(
+                color: AppColors.primary,
+                borderRadius: BorderRadius.circular(AppRadii.pill),
+                boxShadow: AppShadows.raised,
+              ),
+              child: const Center(
+                child: Text(
+                  'START VERIFICATION',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 15,
+                    letterSpacing: 1.2,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: AppSpacing.x3),
+        Container(
+          width: 58,
+          height: 58,
+          decoration: BoxDecoration(
+            color: AppColors.textPrimary,
+            shape: BoxShape.circle,
+            boxShadow: AppShadows.base,
+          ),
+          child: const Icon(
+            Icons.arrow_forward,
+            color: Colors.white,
+            size: 22,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// "SATELLITE" badge widget
+class _SatelliteBadge extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        border: Border.all(color: AppColors.primary, width: 2),
+        borderRadius: BorderRadius.circular(AppRadii.pill),
+        color: AppColors.primary.withValues(alpha: 0.08),
+      ),
+      child: const Text(
+        'SATELLITE',
+        style: TextStyle(
+          color: AppColors.textPrimary,
+          fontSize: 34,
+          fontWeight: FontWeight.w900,
+          letterSpacing: -0.8,
+          height: 1.0,
         ),
       ),
     );
   }
 }
 
-class _LoadingDots extends StatefulWidget {
+// Topographic contour lines painter
+class _TopoPainter extends CustomPainter {
   @override
-  State<_LoadingDots> createState() => _LoadingDotsState();
-}
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = AppColors.borderStrong.withValues(alpha: 0.5)
+      ..strokeWidth = 1.2
+      ..style = PaintingStyle.stroke;
 
-class _LoadingDotsState extends State<_LoadingDots>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
+    final greenPaint = Paint()
+      ..color = AppColors.primary.withValues(alpha: 0.15)
+      ..style = PaintingStyle.fill;
 
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 900),
-    )..repeat();
+    // Draw topographic contour-like curved lines
+    final random = math.Random(42);
+    final curves = 18;
+
+    for (int i = 0; i < curves; i++) {
+      final path = Path();
+      final yBase = size.height * (i / curves);
+      final amplitude = 20.0 + random.nextDouble() * 30;
+      final freq = 0.6 + random.nextDouble() * 0.8;
+
+      path.moveTo(0, yBase);
+      for (double x = 0; x <= size.width; x += 4) {
+        final y = yBase +
+            amplitude * math.sin((x / size.width) * math.pi * freq * 2 +
+                i * 0.3);
+        path.lineTo(x, y);
+      }
+      canvas.drawPath(path, paint);
+    }
+
+    // Draw an oval "lake" shape with green fill (top right area)
+    final center = Offset(size.width * 0.72, size.height * 0.30);
+    final ovalPath = Path();
+    for (int ring = 3; ring >= 0; ring--) {
+      final rx = 55.0 + ring * 22;
+      final ry = 38.0 + ring * 16;
+      ovalPath.addOval(Rect.fromCenter(
+        center: center,
+        width: rx * 2,
+        height: ry * 2,
+      ));
+    }
+    canvas.drawPath(ovalPath, greenPaint);
+
+    // Oval borders
+    for (int ring = 0; ring < 4; ring++) {
+      final rx = 55.0 + ring * 22;
+      final ry = 38.0 + ring * 16;
+      canvas.drawOval(
+        Rect.fromCenter(center: center, width: rx * 2, height: ry * 2),
+        paint
+          ..color =
+              AppColors.primary.withValues(alpha: 0.2 - ring * 0.04),
+      );
+    }
+
+    // Reset paint color
+    paint.color = AppColors.borderStrong.withValues(alpha: 0.4);
   }
 
   @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _controller,
-      builder: (context, child) {
-        return Row(
-          mainAxisSize: MainAxisSize.min,
-          children: List.generate(3, (i) {
-            final delay = i / 3;
-            final value = (_controller.value - delay).clamp(0.0, 1.0);
-            final opacity = (1 - (value * 2 - 1).abs()).clamp(0.2, 1.0);
-            return Container(
-              margin: const EdgeInsets.symmetric(horizontal: 3),
-              width: 6,
-              height: 6,
-              decoration: BoxDecoration(
-                color: AppColors.accent.withValues(alpha: opacity),
-                shape: BoxShape.circle,
-              ),
-            );
-          }),
-        );
-      },
-    );
-  }
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

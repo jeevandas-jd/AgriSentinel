@@ -1,18 +1,17 @@
 import 'package:flutter/material.dart';
-
 import '../theme/app_theme.dart';
 
 class AppPrimaryButton extends StatefulWidget {
-  final String label;
   final VoidCallback? onPressed;
   final bool isLoading;
+  final String label;
   final IconData? icon;
 
   const AppPrimaryButton({
     super.key,
-    required this.label,
-    this.onPressed,
+    required this.onPressed,
     this.isLoading = false,
+    required this.label,
     this.icon,
   });
 
@@ -20,62 +19,99 @@ class AppPrimaryButton extends StatefulWidget {
   State<AppPrimaryButton> createState() => _AppPrimaryButtonState();
 }
 
-class _AppPrimaryButtonState extends State<AppPrimaryButton> {
-  bool _pressed = false;
+class _AppPrimaryButtonState extends State<AppPrimaryButton>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _pressController;
+  late Animation<double> _scaleAnim;
+
+  @override
+  void initState() {
+    super.initState();
+    _pressController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 120),
+      reverseDuration: const Duration(milliseconds: 200),
+      lowerBound: 0.95,
+      upperBound: 1.0,
+      value: 1.0,
+    );
+    _scaleAnim = _pressController;
+  }
+
+  @override
+  void dispose() {
+    _pressController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final disabled = widget.onPressed == null || widget.isLoading;
-    return AnimatedScale(
-      duration: const Duration(milliseconds: 120),
-      curve: Curves.easeOut,
-      scale: _pressed ? 0.98 : 1.0,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 220),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(AppRadii.m),
-          gradient: disabled
-              ? null
-              : const LinearGradient(
-                  colors: [AppColors.accentSoft, AppColors.accent],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-          boxShadow: disabled ? AppShadows.base : AppShadows.raised,
+    final isDisabled = widget.onPressed == null;
+
+    return GestureDetector(
+      onTapDown: isDisabled
+          ? null
+          : (_) => _pressController.reverse(),
+      onTapUp: isDisabled
+          ? null
+          : (_) {
+              _pressController.forward();
+              widget.onPressed?.call();
+            },
+      onTapCancel: isDisabled ? null : () => _pressController.forward(),
+      child: AnimatedBuilder(
+        animation: _scaleAnim,
+        builder: (context, child) => Transform.scale(
+          scale: _scaleAnim.value,
+          child: child,
         ),
-        child: ElevatedButton(
-          onPressed: disabled ? null : widget.onPressed,
-          onHover: (_) {},
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.transparent,
-            shadowColor: Colors.transparent,
-            disabledBackgroundColor: AppColors.card,
-          ),
-          child: Listener(
-            onPointerDown: (_) => setState(() => _pressed = true),
-            onPointerUp: (_) => setState(() => _pressed = false),
-            onPointerCancel: (_) => setState(() => _pressed = false),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                if (widget.isLoading) ...[
-                  const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white,
-                    ),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          height: 56,
+          decoration: BoxDecoration(
+            gradient: isDisabled
+                ? null
+                : const LinearGradient(
+                    colors: [AppColors.accent, AppColors.primary],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                   ),
-                  const SizedBox(width: AppSpacing.x2),
-                ] else if (widget.icon != null) ...[
-                  Icon(widget.icon, size: 18),
-                  const SizedBox(width: AppSpacing.x2),
+            color: isDisabled ? AppColors.border : null,
+            borderRadius: BorderRadius.circular(AppRadii.m),
+            boxShadow: isDisabled ? null : AppShadows.raised,
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (widget.isLoading)
+                const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.5,
+                    color: Colors.white,
+                  ),
+                )
+              else ...[
+                if (widget.icon != null) ...[
+                  Icon(
+                    widget.icon,
+                    size: 18,
+                    color: isDisabled ? AppColors.textMuted : Colors.white,
+                  ),
+                  const SizedBox(width: 8),
                 ],
-                Text(widget.label),
+                Text(
+                  widget.label,
+                  style: TextStyle(
+                    color: isDisabled ? AppColors.textMuted : Colors.white,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                    letterSpacing: 0.3,
+                  ),
+                ),
               ],
-            ),
+            ],
           ),
         ),
       ),

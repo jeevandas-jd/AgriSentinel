@@ -43,10 +43,10 @@ class _FeatureCardState extends State<FeatureCard> {
                   width: 38,
                   height: 38,
                   decoration: BoxDecoration(
-                    color: AppColors.accent.withValues(alpha: 0.15),
+                    color: AppColors.primary.withValues(alpha: 0.12),
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(widget.icon, color: AppColors.accent, size: 20),
+                  child: Icon(widget.icon, color: AppColors.primary, size: 20),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
